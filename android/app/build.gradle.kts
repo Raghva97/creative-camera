@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.creativecamera.creative_camera"
-    compileSdk = flutter.compileSdkVersion
+    // haishin_kit and permission_handler need API 37 to compile against.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
