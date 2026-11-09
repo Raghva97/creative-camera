@@ -71,7 +71,7 @@ class StackWorker {
 
   /// Sends a frame and waits until it has been blended. Returns the frame
   /// count and whether the engine has all the frames it wants.
-  Future<(int, bool)> addFrame(RawFrame f) async {
+  Future<(int, bool)> addFrame(RawFrame f, {int rotationDegrees = 0}) async {
     final reply = await _request({
       'cmd': 'frame',
       'data': TransferableTypedData.fromList([f.bytes]),
@@ -79,6 +79,7 @@ class StackWorker {
       'h': f.height,
       'stride': f.bytesPerRow,
       'bgra': f.isBgra,
+      'rotation': rotationDegrees,
     });
     return (reply['frames'] as int, reply['full'] as bool);
   }
@@ -88,12 +89,14 @@ class StackWorker {
     required String path,
     required int rotationDegrees,
     bool night = false,
+    double nightGain = 4.0,
   }) async {
     final reply = await _request({
       'cmd': 'finish',
       'path': path,
       'rotation': rotationDegrees,
       'night': night,
+      'gain': nightGain,
     });
     return reply['path'] as String?;
   }
@@ -116,6 +119,7 @@ class StackWorker {
           engine = StackEngine(StackOptions.fromMap(msg['options'] as Map));
         case 'frame':
           final e = engine!;
+          if (e.frameCount == 0) e.rotationDegrees = msg['rotation'] as int;
           final bytes = (msg['data'] as TransferableTypedData)
               .materialize()
               .asUint8List();
@@ -149,7 +153,12 @@ class StackWorker {
             return;
           }
           var result = e.result();
-          if (msg['night'] == true) result = nightTone(result);
+          if (msg['night'] == true) {
+            result = nightTone(
+              result,
+              maxGain: (msg['gain'] as num).toDouble(),
+            );
+          }
           final im = toImage(result, msg['rotation'] as int);
           final path = msg['path'] as String;
           File(path).writeAsBytesSync(img.encodeJpg(im, quality: 95));

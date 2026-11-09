@@ -111,6 +111,22 @@ void main() {
       }
     });
 
+    test('slit scan uses sensor rows when the frame is rotated', () {
+      // Rotated 90 degrees, a vertical on-screen slit is a sensor row, and
+      // the sweep runs from the bottom sensor row upward (left to right on
+      // screen).
+      final e = StackEngine(
+        const StackOptions(blend: StackBlend.slitScan, slitWidth: 1),
+      )..rotationDegrees = 90;
+      for (var i = 0; i < 6; i++) {
+        e.add(frame(2, 6, (x, y) => (i * 40, 0, 0)));
+      }
+      expect(e.isFull, isTrue);
+      for (var y = 0; y < 6; y++) {
+        expect(px(e.result(), 0, y).$1, (5 - y) * 40);
+      }
+    });
+
     test('echo leaves a fading copy of a moving subject', () {
       final e = StackEngine(
         const StackOptions(blend: StackBlend.echo, echoDecay: 0.5),

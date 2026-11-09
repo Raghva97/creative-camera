@@ -50,6 +50,7 @@ class StackOptions {
     this.echoDecay = 0.85,
     this.slitWidth = 4,
     this.lightenThreshold = 0,
+    this.slitDisplayVertical = true,
   });
 
   final StackBlend blend;
@@ -73,6 +74,12 @@ class StackOptions {
   /// from slowly brightening and keeps only real light sources.
   final int lightenThreshold;
 
+  /// For [StackBlend.slitScan]: true takes a vertical slit as the user sees
+  /// the screen and sweeps it left to right; false takes a horizontal slit
+  /// and sweeps it top to bottom. The engine maps this onto the sensor's
+  /// own axes using the frame rotation.
+  final bool slitDisplayVertical;
+
   Map<String, Object> toMap() => {
     'blend': blend.index,
     'align': align,
@@ -80,6 +87,7 @@ class StackOptions {
     'echoDecay': echoDecay,
     'slitWidth': slitWidth,
     'lightenThreshold': lightenThreshold,
+    'slitDisplayVertical': slitDisplayVertical,
   };
 
   static StackOptions fromMap(Map<dynamic, dynamic> m) => StackOptions(
@@ -89,6 +97,7 @@ class StackOptions {
     echoDecay: (m['echoDecay'] as num).toDouble(),
     slitWidth: m['slitWidth'] as int,
     lightenThreshold: m['lightenThreshold'] as int,
+    slitDisplayVertical: m['slitDisplayVertical'] as bool? ?? true,
   );
 }
 
@@ -126,13 +135,21 @@ class StackEngine {
   int _thumbW = 0;
   int _thumbH = 0;
 
+  /// Clockwise rotation (degrees) that turns sensor frames upright. Set
+  /// before the first frame; slit-scan uses it to pick its axis.
+  int rotationDegrees = 0;
+  bool _slitRows = false;
+  bool _slitReverse = false;
+
   int get frameCount => _count;
   int get width => _w;
   int get height => _h;
 
   bool get isFull =>
       options.maxFrames > 0 && _count >= options.maxFrames ||
-      options.blend == StackBlend.slitScan && _w > 0 && _slitCursor >= _w;
+      options.blend == StackBlend.slitScan &&
+          _w > 0 &&
+          _slitCursor >= (_slitRows ? _h : _w);
 
   /// Adds one frame. Frames with a different size than the first are
   /// ignored (the camera changed resolution mid capture).
@@ -202,6 +219,12 @@ class StackEngine {
         _echo = Float32List(n);
       case StackBlend.slitScan:
         _slit = Uint8List(n);
+        final r = rotationDegrees % 360;
+        final quarter = r == 90 || r == 270;
+        // A slit that looks vertical on screen is a sensor row when the
+        // frame is rotated a quarter turn.
+        _slitRows = options.slitDisplayVertical == quarter;
+        _slitReverse = r == 180 || (_slitRows && r == 90);
     }
   }
 
@@ -227,15 +250,24 @@ class StackEngine {
   void _addSlit(Uint8List src) {
     final out = _slit!;
     final sw = options.slitWidth;
-    final centre = _w ~/ 2 - sw ~/ 2;
-    for (var y = 0; y < _h; y++) {
-      final row = y * _w * 3;
-      for (var k = 0; k < sw && _slitCursor + k < _w; k++) {
-        final s = row + (centre + k) * 3;
-        final d = row + (_slitCursor + k) * 3;
-        out[d] = src[s];
-        out[d + 1] = src[s + 1];
-        out[d + 2] = src[s + 2];
+    final length = _slitRows ? _h : _w;
+    final centre = length ~/ 2 - sw ~/ 2;
+    for (var k = 0; k < sw && _slitCursor + k < length; k++) {
+      final from = centre + k;
+      final pos = _slitCursor + k;
+      final to = _slitReverse ? length - 1 - pos : pos;
+      if (_slitRows) {
+        // Copy a whole sensor row.
+        final s0 = from * _w * 3, d0 = to * _w * 3;
+        out.setRange(d0, d0 + _w * 3, src, s0);
+      } else {
+        for (var y = 0; y < _h; y++) {
+          final row = y * _w * 3;
+          final s = row + from * 3, d = row + to * 3;
+          out[d] = src[s];
+          out[d + 1] = src[s + 1];
+          out[d + 2] = src[s + 2];
+        }
       }
     }
     _slitCursor += sw;
