@@ -38,12 +38,22 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Build APK
-        run: flutter build apk --release --split-per-abi
+      - name: Build APKs and App Bundle
+        run: |
+          mkdir -p dist/creative-camera-android
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk dist/creative-camera-android/creative-camera-universal.apk
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-*-release.apk dist/creative-camera-android/
+          flutter build appbundle --release
+          cp build/app/outputs/bundle/release/app-release.aab dist/creative-camera-android/creative-camera.aab
+      - name: Package Android zip
+        run: |
+          cd dist && zip -qr creative-camera-android.zip creative-camera-android
       - uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          name: creative-camera-android
+          path: dist/creative-camera-android.zip
 
   ios:
     needs: test
