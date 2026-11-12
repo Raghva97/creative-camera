@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.creativecamera.creative_camera"
+    namespace = "com.paro.xxx"
     // haishin_kit and permission_handler need API 37 to compile against.
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
@@ -16,8 +16,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.creativecamera.creative_camera"
+        // Package name requested for the Android release.
+        applicationId = "com.paro.xxx"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
